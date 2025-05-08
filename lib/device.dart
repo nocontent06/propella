@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
 
 class Device {
-  final String name;
-  final String type;
-  final String osVersion;
-  final String serialNumber;
-  final String color;
-  final String storage;
-  final String? imei;
-  final String? processor;
-  final String? ram;
-  final IconData icon;
-  final String status;
-  final String department;
+  String name;
+  String type;
+  String osVersion;
+  String serialNumber;
+  String color;
+  String storage;
+  String? imei;
+  String? processor;
+  String? ram;
+  IconData icon;
+  String status;
+  String department;
 
   Device({
     required this.name,

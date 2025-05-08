@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'home_page.dart';
-import 'analytics_page.dart';
-import 'template_page.dart'; // Import the TemplatePage
+import 'template_page.dart';
+import 'manage_page.dart'; // Replaces analytics_page.dart
 import 'settings_page.dart';
 
 void main() {
@@ -25,6 +25,12 @@ class _MainAppState extends State<MainApp> {
     });
   }
 
+  void _updateTheme(bool isDark) {
+    setState(() {
+      _isDarkMode = isDark;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -33,11 +39,14 @@ class _MainAppState extends State<MainApp> {
         body: SafeArea(
           child: IndexedStack(
             index: _selectedIndex,
-            children: const [
-              HomePage(),
-              TemplatePage(), // Replace CreatePage with TemplatePage
-              AnalyticsPage(),
-              SettingsPage(),
+            children: [
+              const HomePage(),
+              const TemplatePage(),
+              const ManagePage(),
+              SettingsPage(
+                isDarkMode: _isDarkMode,
+                onThemeChanged: _updateTheme,
+              ),
             ],
           ),
         ),
@@ -56,9 +65,9 @@ class _MainAppState extends State<MainApp> {
               label: 'Create',
             ),
             NavigationDestination(
-              icon: Icon(Icons.analytics_outlined),
-              selectedIcon: Icon(Icons.analytics),
-              label: 'Analytics',
+              icon: Icon(Icons.devices_other),
+              selectedIcon: Icon(Icons.devices_other_outlined),
+              label: 'Manage',
             ),
             NavigationDestination(
               icon: Icon(Icons.settings_outlined),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'device.dart';
 import 'device_data.dart';
+import 'category_settings.dart'; // Import the shared settings
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -26,26 +27,23 @@ class _HomePageState extends State<HomePage> {
     setState(() {});
   }
 
-  List<Map<String, dynamic>> get _typeCategories => [
-    {
-      'name': 'iOS Devices',
-      'count': devices.where((d) => d.type == 'iOS').length,
-      'color': Colors.blue,
-      'icon': Icons.phone_iphone,
-    },
-    {
-      'name': 'Android Devices',
-      'count': devices.where((d) => d.type == 'Android').length,
-      'color': Colors.green,
-      'icon': Icons.phone_android,
-    },
-    {
-      'name': 'Windows Devices',
-      'count': devices.where((d) => d.type == 'Windows').length,
-      'color': Colors.orange,
-      'icon': Icons.laptop,
-    },
-  ];
+  List<Map<String, dynamic>> get _typeCategories {
+    final types = devices.map((d) => d.type).toSet();
+    return types.map((type) {
+      final count = devices.where((d) => d.type == type).length;
+      final mapping = categorySettingsNotifier.value[type] ??
+          {
+            'icon': Icons.devices_other,
+            'color': Colors.grey,
+          };
+      return {
+        'name': type,
+        'count': count,
+        'icon': mapping['icon'],
+        'color': mapping['color'],
+      };
+    }).toList();
+  }
 
   List<Map<String, dynamic>> get _statusCategories {
     final statuses = devices.map((d) => d.status ?? 'Unknown').where((s) => s != null).toSet().toList();
@@ -74,6 +72,8 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _showChartMenu() async {
+    // Create a local copy of the current chart order
+    List<String> tempChartOrder = List.from(_chartOrder);
     await showModalBottomSheet(
       context: context,
       builder: (context) {
@@ -84,56 +84,72 @@ class _HomePageState extends State<HomePage> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('Charts', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                  const Text('Charts',
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 18)),
                   const SizedBox(height: 16),
-                  ..._chartOrder.map((chart) => Row(
-                    children: [
-                      Checkbox(
-                        value: _chartVisibility[chart],
-                        onChanged: (val) {
-                          setStateSheet(() => _chartVisibility[chart] = val!);
-                          setState(() => _chartVisibility[chart] = val!);
-                        },
-                      ),
-                      Expanded(child: Text(_chartTitle(chart))),
-                      IconButton(
-                        icon: const Icon(Icons.arrow_upward),
-                        onPressed: () {
-                          final idx = _chartOrder.indexOf(chart);
-                          if (idx > 0) {
-                            setStateSheet(() {
-                              final tmp = _chartOrder[idx - 1];
-                              _chartOrder[idx - 1] = _chartOrder[idx];
-                              _chartOrder[idx] = tmp;
-                            });
-                            setState(() {
-                              final tmp = _chartOrder[idx - 1];
-                              _chartOrder[idx - 1] = _chartOrder[idx];
-                              _chartOrder[idx] = tmp;
-                            });
-                          }
-                        },
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.arrow_downward),
-                        onPressed: () {
-                          final idx = _chartOrder.indexOf(chart);
-                          if (idx < _chartOrder.length - 1) {
-                            setStateSheet(() {
-                              final tmp = _chartOrder[idx + 1];
-                              _chartOrder[idx + 1] = _chartOrder[idx];
-                              _chartOrder[idx] = tmp;
-                            });
-                            setState(() {
-                              final tmp = _chartOrder[idx + 1];
-                              _chartOrder[idx + 1] = _chartOrder[idx];
-                              _chartOrder[idx] = tmp;
-                            });
-                          }
-                        },
-                      ),
-                    ],
-                  )),
+                  ...tempChartOrder.map((chart) => Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Checkbox(
+                                value: _chartVisibility[chart],
+                                onChanged: (val) {
+                                  setStateSheet(
+                                      () => _chartVisibility[chart] = val!);
+                                  setState(
+                                      () => _chartVisibility[chart] = val!);
+                                },
+                              ),
+                              Text(_chartTitle(chart)),
+                            ],
+                          ),
+                          Row(
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.arrow_upward),
+                                onPressed: () {
+                                  final idx = tempChartOrder.indexOf(chart);
+                                  if (idx > 0) {
+                                    setStateSheet(() {
+                                      final tmp = tempChartOrder[idx - 1];
+                                      tempChartOrder[idx - 1] =
+                                          tempChartOrder[idx];
+                                      tempChartOrder[idx] = tmp;
+                                    });
+                                  }
+                                },
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.arrow_downward),
+                                onPressed: () {
+                                  final idx = tempChartOrder.indexOf(chart);
+                                  if (idx < tempChartOrder.length - 1) {
+                                    setStateSheet(() {
+                                      final tmp = tempChartOrder[idx + 1];
+                                      tempChartOrder[idx + 1] =
+                                          tempChartOrder[idx];
+                                      tempChartOrder[idx] = tmp;
+                                    });
+                                  }
+                                },
+                              ),
+                            ],
+                          ),
+                        ],
+                      )),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () {
+                      // Update parent state with the new order and close sheet
+                      setState(() {
+                        _chartOrder = tempChartOrder;
+                      });
+                      Navigator.pop(context);
+                    },
+                    child: const Text('Done'),
+                  )
                 ],
               ),
             );
@@ -176,20 +192,24 @@ class _HomePageState extends State<HomePage> {
         title: const Text('Dashboard'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _refreshCharts, // Manual refresh button
+            icon: const Icon(Icons.sort), // Order button icon
+            onPressed: _showChartMenu, // Opens the chart ordering menu
           ),
         ],
       ),
       body: RefreshIndicator(
         onRefresh: _refreshCharts, // Pull-to-refresh functionality
         child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(), // Ensure scrollable even if content is small
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ..._chartOrder.where((key) => _chartVisibility[key] == true).map(_buildChart),
+              // Build all charts in the order defined in _chartOrder.
+              ..._chartOrder
+                  .where((key) => _chartVisibility[key] == true)
+                  .map(_buildChart)
+                  .toList(),
             ],
           ),
         ),
@@ -239,6 +259,8 @@ class _DeviceBarChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
+    final textColor = brightness == Brightness.dark ? Colors.white : Colors.black;
     final total = categories.fold<int>(0, (sum, c) => sum + c['count'] as int);
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -283,8 +305,8 @@ class _DeviceBarChart extends StatelessWidget {
             children: [
               Text(
                 '$percent%',
-                style: const TextStyle(
-                  color: Colors.black,
+                style: TextStyle(
+                  color: textColor,
                   fontWeight: FontWeight.bold,
                   fontSize: 14,
                 ),
@@ -322,14 +344,17 @@ class _DeviceBarChart extends StatelessWidget {
 
 class _DeviceOverviewSheet extends StatelessWidget {
   final List<Device> devices;
-  final String title; // Add a title parameter
+  final String title; // Pass the clicked category name as the title
 
-  const _DeviceOverviewSheet({required this.devices, required this.title}); // Update constructor
+  const _DeviceOverviewSheet({required this.devices, required this.title});
 
   @override
   Widget build(BuildContext context) {
-    final typeColor = devices.isNotEmpty ? _typeColor(devices.first.type) : Colors.blue;
-    final typeIcon = devices.isNotEmpty ? _typeIcon(devices.first.type) : Icons.devices_other;
+    // Use the first device's type to look up the shared category settings.
+    final mapping = devices.isNotEmpty ? categorySettingsNotifier.value[devices.first.type] : null;
+    final typeColor = mapping != null ? mapping['color'] as Color : Colors.blue;
+    final typeIcon = mapping != null ? mapping['icon'] as IconData : Icons.devices_other;
+    
     return Container(
       decoration: const BoxDecoration(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -348,7 +373,7 @@ class _DeviceOverviewSheet extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    title, // Use the dynamic title here
+                    title, // Dynamic title from clicked category
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -371,13 +396,18 @@ class _DeviceOverviewSheet extends StatelessWidget {
               separatorBuilder: (context, i) => const SizedBox(height: 12),
               itemBuilder: (context, i) {
                 final device = devices[i];
+                // Optionally, update each device row avatar using the shared settings as well.
+                final deviceMapping = categorySettingsNotifier.value[device.type] ?? {
+                  'color': Colors.grey,
+                  'icon': Icons.devices_other,
+                };
                 return Card(
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   elevation: 2,
                   child: ListTile(
                     leading: CircleAvatar(
                       backgroundColor: typeColor.withOpacity(0.12),
-                      child: Icon(device.icon, color: typeColor),
+                      child: Icon(deviceMapping['icon'] as IconData, color: typeColor),
                     ),
                     title: Text(device.name, style: const TextStyle(fontWeight: FontWeight.bold)),
                     subtitle: Column(
@@ -406,32 +436,6 @@ class _DeviceOverviewSheet extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  Color _typeColor(String type) {
-    switch (type) {
-      case 'iOS':
-        return Colors.blue;
-      case 'Android':
-        return Colors.green;
-      case 'Windows':
-        return Colors.orange;
-      default:
-        return Colors.grey;
-    }
-  }
-
-  IconData _typeIcon(String type) {
-    switch (type) {
-      case 'iOS':
-        return Icons.phone_iphone;
-      case 'Android':
-        return Icons.phone_android;
-      case 'Windows':
-        return Icons.laptop;
-      default:
-        return Icons.devices_other;
-    }
   }
 }
 

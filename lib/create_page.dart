@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'device.dart';
 import 'device_data.dart';
+import 'category_settings.dart'; // For shared categories, if needed
 
 class PortfolioPage extends StatelessWidget {
   const PortfolioPage({super.key});
@@ -15,11 +16,23 @@ class PortfolioPage extends StatelessWidget {
           final device = devices[index];
           return ListTile(
             leading: Icon(device.icon),
-            title: Text(device.name),
-            subtitle: Text('Type: ${device.type}\nStatus: ${device.status}'),
+            title: Text(
+              device.name,
+              style: const TextStyle(fontSize: 16),
+              maxLines: 1, // Prevents overflow by limiting to one line
+              overflow: TextOverflow.ellipsis, // Adds ellipsis if text overflows
+            ),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Type: ${device.type}'),
+                Text('Status: ${device.status}'),
+              ],
+            ),
             onTap: () {
               showModalBottomSheet(
                 context: context,
+                isScrollControlled: true, // Allows the modal to adjust dynamically
                 builder: (context) => _DeviceDetailSheet(device: device),
               );
             },
@@ -69,37 +82,130 @@ class CreatePage extends StatefulWidget {
 
 class _CreatePageState extends State<CreatePage> {
   final _formKey = GlobalKey<FormState>();
-  final _serialNumberController = TextEditingController();
-  final _departmentController = TextEditingController();
+
+  // Controllers for text fields.
+  late TextEditingController _nameController;
+  late TextEditingController _osController;
+  late TextEditingController _snController;
+  late TextEditingController _colorController;
+  late TextEditingController _storageController;
+  late TextEditingController _departmentController;
+  final TextEditingController _customCategoryController = TextEditingController();
+  final TextEditingController _customStatusController = TextEditingController();
+
+  // Dropdown selections.
+  String? _selectedCategory;
+  String? _selectedStatus;
+  bool _isCustomCategory = false;
+  bool _isCustomStatus = false;
+
+  // Icon selection.
+  IconData? _selectedIcon;
+
+  // Predefined values.
+  final List<String> _defaultStatuses = ['Active', 'Inactive'];
+  // Use shared categories from categorySettingsNotifier if available.
+  List<String> get _defaultCategories {
+    // If no category exists, use these defaults.
+    if (categorySettingsNotifier.value.isEmpty) {
+      return ['iOS', 'Android', 'Windows'];
+    }
+    return categorySettingsNotifier.value.keys.toList();
+  }
+
+  // List of icon options.
+  final List<IconData> _iconOptions = [
+    Icons.phone_iphone,
+    Icons.phone_android,
+    Icons.laptop,
+    Icons.devices_other
+  ];
 
   @override
   void initState() {
     super.initState();
-    if (widget.template != null) {
-      _serialNumberController.text = 'Unknown'; // Default serial number
-      _departmentController.text = widget.template!.department ?? 'Unknown';
+    // Initialize controllers with template values if provided.
+    _nameController = TextEditingController(text: widget.template?.name ?? '');
+    _osController = TextEditingController(text: widget.template?.osVersion ?? '');
+    _snController = TextEditingController(text: widget.template?.serialNumber ?? '');
+    _colorController = TextEditingController(text: widget.template?.color ?? '');
+    _storageController = TextEditingController(text: widget.template?.storage ?? '');
+    _departmentController = TextEditingController(text: widget.template?.department ?? '');
+
+    _selectedCategory = widget.template?.type;
+    _selectedStatus = widget.template?.status ?? _defaultStatuses.first;
+    _selectedIcon = widget.template?.icon ?? Icons.devices_other;
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _osController.dispose();
+    _snController.dispose();
+    _colorController.dispose();
+    _storageController.dispose();
+    _departmentController.dispose();
+    _customCategoryController.dispose();
+    _customStatusController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickIcon() async {
+    // Show a dialog for icon selection.
+    final IconData? chosenIcon = await showDialog<IconData>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Choose Icon'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: GridView.count(
+              crossAxisCount: 4,
+              shrinkWrap: true,
+              children: _iconOptions.map((iconData) {
+                return GestureDetector(
+                  onTap: () => Navigator.pop(context, iconData),
+                  child: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Icon(iconData, size: 32, color: _selectedIcon == iconData ? Colors.blue : Colors.black54),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        );
+      },
+    );
+    if (chosenIcon != null) {
+      setState(() {
+        _selectedIcon = chosenIcon;
+      });
     }
   }
 
   void _saveDevice() {
     if (_formKey.currentState!.validate()) {
+      // Use custom category if selected.
+      final deviceCategory = _isCustomCategory ? _customCategoryController.text.trim() : _selectedCategory ?? 'Unknown';
+      // Use custom status if selected.
+      final deviceStatus = _isCustomStatus ? _customStatusController.text.trim() : _selectedStatus ?? 'Unknown';
+
       final newDevice = Device(
-        name: widget.template?.name ?? 'Custom Device',
-        type: widget.template?.type ?? 'Unknown',
-        osVersion: widget.template?.osVersion ?? 'Unknown',
-        serialNumber: _serialNumberController.text,
-        color: widget.template?.color ?? 'Unknown',
-        storage: widget.template?.storage ?? 'Unknown',
-        icon: widget.template?.icon ?? Icons.devices_other,
-        status: 'Active',
-        department: _departmentController.text,
+        name: _nameController.text.trim(),
+        type: deviceCategory,
+        osVersion: _osController.text.trim(),
+        serialNumber: _snController.text.trim(),
+        color: _colorController.text.trim(),
+        storage: _storageController.text.trim(),
+        icon: _selectedIcon ?? Icons.devices_other,
+        status: deviceStatus,
+        department: _departmentController.text.trim(),
       );
 
       setState(() {
         devices.add(newDevice); // Add the new device to the global list
       });
 
-      // Show a Snackbar notification
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Device "${newDevice.name}" has been created!'),
@@ -109,44 +215,132 @@ class _CreatePageState extends State<CreatePage> {
         ),
       );
 
-      Navigator.pop(context); // Go back to the previous page
+      Navigator.pop(context);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final isTemplate = widget.template != null;
-
     return Scaffold(
       appBar: AppBar(
-        title: Text(isTemplate ? 'Create from Template' : 'Create New Device'),
+        title: Text(isTemplate ? 'Create from Template' : 'Create Custom Device'),
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Form(
           key: _formKey,
           child: Column(
             children: [
-              if (isTemplate)
-                TextFormField(
-                  initialValue: widget.template!.name,
-                  decoration: const InputDecoration(labelText: 'Device Name'),
-                  readOnly: true,
-                ),
-              if (isTemplate)
-                TextFormField(
-                  initialValue: widget.template!.type,
-                  decoration: const InputDecoration(labelText: 'Device Type'),
-                  readOnly: true,
-                ),
+              // 1. Name (Required)
               TextFormField(
-                controller: _serialNumberController,
-                decoration: const InputDecoration(labelText: 'Serial Number'),
+                controller: _nameController,
+                decoration: const InputDecoration(labelText: 'Name *'),
+                validator: (value) => value == null || value.isEmpty ? 'Please enter a name' : null,
+              ),
+              const SizedBox(height: 16),
+              // 2. Type (Category) Dropdown with "Create new category"
+              DropdownButtonFormField<String>(
+                value: _selectedCategory,
+                decoration: const InputDecoration(labelText: 'Device Type *'),
+                items: [
+                  ..._defaultCategories.map((cat) => DropdownMenuItem(value: cat, child: Text(cat))),
+                  const DropdownMenuItem(value: 'Custom', child: Text('Create New Category')),
+                ],
+                onChanged: (value) {
+                  setState(() {
+                    _selectedCategory = value;
+                    _isCustomCategory = value == 'Custom';
+                  });
+                },
+                validator: (value) {
+                  if (value == null || value.isEmpty) return 'Please select a device type';
+                  if (value == 'Custom' && _customCategoryController.text.trim().isEmpty) {
+                    return 'Please enter a device type';
+                  }
+                  return null;
+                },
+              ),
+              if (_isCustomCategory)
+                TextFormField(
+                  controller: _customCategoryController,
+                  decoration: const InputDecoration(labelText: 'New Device Type *'),
+                  validator: (value) => value == null || value.isEmpty ? 'Please enter a device type' : null,
+                ),
+              const SizedBox(height: 16),
+              // 3. OS (Required)
+              TextFormField(
+                controller: _osController,
+                decoration: const InputDecoration(labelText: 'Operating System *'),
+                validator: (value) => value == null || value.isEmpty ? 'Please enter the OS version' : null,
+              ),
+              const SizedBox(height: 16),
+              // 4. Serial Number (Required)
+              TextFormField(
+                controller: _snController,
+                decoration: const InputDecoration(labelText: 'Serial Number *'),
                 validator: (value) => value == null || value.isEmpty ? 'Please enter a serial number' : null,
               ),
+              const SizedBox(height: 16),
+              // 5. Color (Optional)
+              TextFormField(
+                controller: _colorController,
+                decoration: const InputDecoration(labelText: 'Color'),
+              ),
+              const SizedBox(height: 16),
+              // 6. Storage (Optional)
+              TextFormField(
+                controller: _storageController,
+                decoration: const InputDecoration(labelText: 'Storage'),
+              ),
+              const SizedBox(height: 16),
+              // 7. Icon (Required) with an icon picker button
+              Row(
+                children: [
+                  const Text('Icon *:', style: TextStyle(fontSize: 16)),
+                  const SizedBox(width: 12),
+                  Icon(_selectedIcon ?? Icons.devices_other, size: 32),
+                  const SizedBox(width: 12),
+                  ElevatedButton(
+                    onPressed: _pickIcon,
+                    child: const Text('Choose Icon'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              // 8. Status Dropdown with "Create new status"
+              DropdownButtonFormField<String>(
+                value: _selectedStatus,
+                decoration: const InputDecoration(labelText: 'Status *'),
+                items: [
+                  ..._defaultStatuses.map((s) => DropdownMenuItem(value: s, child: Text(s))),
+                  const DropdownMenuItem(value: 'Custom', child: Text('Create New Status')),
+                ],
+                onChanged: (value) {
+                  setState(() {
+                    _selectedStatus = value;
+                    _isCustomStatus = value == 'Custom';
+                  });
+                },
+                validator: (value) {
+                  if (value == null || value.isEmpty) return 'Please select a status';
+                  if (value == 'Custom' && _customStatusController.text.trim().isEmpty) {
+                    return 'Please enter a status';
+                  }
+                  return null;
+                },
+              ),
+              if (_isCustomStatus)
+                TextFormField(
+                  controller: _customStatusController,
+                  decoration: const InputDecoration(labelText: 'New Status *'),
+                  validator: (value) => value == null || value.isEmpty ? 'Please enter a status' : null,
+                ),
+              const SizedBox(height: 16),
+              // 9. Department (Required)
               TextFormField(
                 controller: _departmentController,
-                decoration: const InputDecoration(labelText: 'Department'),
+                decoration: const InputDecoration(labelText: 'Department *'),
                 validator: (value) => value == null || value.isEmpty ? 'Please enter a department' : null,
               ),
               const SizedBox(height: 20),
