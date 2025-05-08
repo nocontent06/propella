@@ -108,7 +108,7 @@ class _CreatePageState extends State<CreatePage> {
   List<String> get _defaultCategories {
     // If no category exists, use these defaults.
     if (categorySettingsNotifier.value.isEmpty) {
-      return ['iOS', 'Android', 'Windows'];
+      return [];
     }
     return categorySettingsNotifier.value.keys.toList();
   }
@@ -121,6 +121,10 @@ class _CreatePageState extends State<CreatePage> {
     Icons.devices_other
   ];
 
+  // Add these inside _CreatePageState class
+  Color _customCategoryColor = Colors.grey;
+  IconData _customCategoryIcon = Icons.devices_other;
+
   @override
   void initState() {
     super.initState();
@@ -132,7 +136,19 @@ class _CreatePageState extends State<CreatePage> {
     _storageController = TextEditingController(text: widget.template?.storage ?? '');
     _departmentController = TextEditingController(text: widget.template?.department ?? '');
 
-    _selectedCategory = widget.template?.type;
+    // Setup the device type.
+    final templateType = widget.template?.type ?? '';
+    if (templateType.isNotEmpty && !_defaultCategories.contains(templateType)) {
+      // If the brand (templateType) isn’t available, set to the custom value.
+      _selectedCategory = 'Custom';
+      _customCategoryController.text = templateType;
+      _isCustomCategory = true; // Unhide the custom field.
+    } else {
+      _selectedCategory = templateType.isNotEmpty
+          ? templateType
+          : (_defaultCategories.isEmpty ? 'Custom' : _defaultCategories.first);
+      _isCustomCategory = _selectedCategory == 'Custom';
+    }
     _selectedStatus = widget.template?.status ?? _defaultStatuses.first;
     _selectedIcon = widget.template?.icon ?? Icons.devices_other;
   }
@@ -183,12 +199,92 @@ class _CreatePageState extends State<CreatePage> {
     }
   }
 
+  Future<void> _pickCustomCategoryIcon() async {
+    final IconData? chosenIcon = await showDialog<IconData>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Choose Category Icon'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: GridView.count(
+              crossAxisCount: 4,
+              shrinkWrap: true,
+              children: _iconOptions.map((iconData) {
+                return GestureDetector(
+                  onTap: () => Navigator.pop(context, iconData),
+                  child: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Icon(
+                      iconData,
+                      size: 32,
+                      color: _customCategoryIcon == iconData ? Colors.blue : Colors.black54,
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        );
+      },
+    );
+    if (chosenIcon != null) {
+      setState(() {
+        _customCategoryIcon = chosenIcon;
+      });
+    }
+  }
+
+  Future<void> _pickCustomCategoryColor() async {
+    final Color? chosenColor = await showDialog<Color>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Choose Category Color'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Wrap(
+              spacing: 8,
+              children: [
+                Colors.grey,
+                Colors.red,
+                Colors.green,
+                Colors.blue,
+                Colors.orange,
+                Colors.purple
+              ].map((color) {
+                return GestureDetector(
+                  onTap: () => Navigator.pop(context, color),
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    color: color,
+                    margin: const EdgeInsets.all(4),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        );
+      },
+    );
+    if (chosenColor != null) {
+      setState(() {
+        _customCategoryColor = chosenColor;
+      });
+    }
+  }
+
   void _saveDevice() {
     if (_formKey.currentState!.validate()) {
       // Use custom category if selected.
-      final deviceCategory = _isCustomCategory ? _customCategoryController.text.trim() : _selectedCategory ?? 'Unknown';
+      final deviceCategory = _isCustomCategory
+          ? _customCategoryController.text.trim()
+          : _selectedCategory ?? 'Unknown';
       // Use custom status if selected.
-      final deviceStatus = _isCustomStatus ? _customStatusController.text.trim() : _selectedStatus ?? 'Unknown';
+      final deviceStatus = _isCustomStatus
+          ? _customStatusController.text.trim()
+          : _selectedStatus ?? 'Unknown';
 
       final newDevice = Device(
         name: _nameController.text.trim(),
@@ -201,6 +297,19 @@ class _CreatePageState extends State<CreatePage> {
         status: deviceStatus,
         department: _departmentController.text.trim(),
       );
+
+      // If it's a new category, add/update the shared category settings.
+      if (_isCustomCategory) {
+        final newCategory = _customCategoryController.text.trim();
+        final currentSettings = categorySettingsNotifier.value;
+        categorySettingsNotifier.value = {
+          ...currentSettings,
+          newCategory: {
+            'icon': _customCategoryIcon,
+            'color': _customCategoryColor,
+          },
+        };
+      }
 
       setState(() {
         devices.add(newDevice); // Add the new device to the global list
@@ -262,10 +371,50 @@ class _CreatePageState extends State<CreatePage> {
                 },
               ),
               if (_isCustomCategory)
-                TextFormField(
-                  controller: _customCategoryController,
-                  decoration: const InputDecoration(labelText: 'New Device Type *'),
-                  validator: (value) => value == null || value.isEmpty ? 'Please enter a device type' : null,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextFormField(
+                      controller: _customCategoryController,
+                      decoration: const InputDecoration(labelText: 'New Device Type *'),
+                      validator: (value) =>
+                          value == null || value.isEmpty ? 'Please enter a device type' : null,
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        const Text('Category Icon:'),
+                        const SizedBox(width: 12),
+                        Icon(_customCategoryIcon, size: 32),
+                        const SizedBox(width: 12),
+                        ElevatedButton(
+                          onPressed: _pickCustomCategoryIcon,
+                          child: const Text('Change Icon'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        const Text('Category Color:'),
+                        const SizedBox(width: 12),
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: _customCategoryColor,
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: Colors.black26),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        ElevatedButton(
+                          onPressed: _pickCustomCategoryColor,
+                          child: const Text('Change Color'),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               const SizedBox(height: 16),
               // 3. OS (Required)

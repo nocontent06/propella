@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'device.dart';
 import 'device_data.dart';
 import 'create_page.dart';
+import 'barcode_scanner_page.dart';
 
 class TemplatePage extends StatelessWidget {
   const TemplatePage({super.key});
@@ -17,27 +18,31 @@ class TemplatePage extends StatelessWidget {
     );
   }
 
-  // Dummy barcode scan method
   Future<void> _scanBarcode(BuildContext context) async {
-    // TODO: integrate actual barcode scanning package here.
-    // For now, simulate scanning and auto-fill data:
-    Device scannedDevice = Device(
-      name: 'Scanned Device',
-      type: 'iOS',
-      osVersion: 'iOS 17',
-      serialNumber: 'SCANNED-12345',
-      color: 'Black',
-      storage: '256GB',
-      icon: Icons.phone_iphone,
-      status: 'Active',
-      department: 'DEP1',
-    );
-    Navigator.push(
+    // Navigate to BarcodeScannerPage and await the returned API data.
+    final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => CreatePage(template: scannedDevice),
+        builder: (context) => const BarcodeScannerPage(),
       ),
     );
+    // Optionally, handle the returned result (if any).
+    if (result != null) {
+      // For example, show a confirmation alert.
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Scanned Device'),
+          content: Text('Device: ${result['name']}\nType: ${result['type']}\nStatus: ${result['status']}'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    }
   }
 
   @override
@@ -46,7 +51,7 @@ class TemplatePage extends StatelessWidget {
       // iPhone Templates
       Device(
         name: 'iPhone 15',
-        type: 'iOS',
+        type: 'Apple',
         osVersion: 'iOS 17',
         serialNumber: 'Unknown',
         color: 'Black',
@@ -57,7 +62,7 @@ class TemplatePage extends StatelessWidget {
       ),
       Device(
         name: 'iPhone 16',
-        type: 'iOS',
+        type: 'Apple',
         osVersion: 'iOS 18',
         serialNumber: 'Unknown',
         color: 'White',

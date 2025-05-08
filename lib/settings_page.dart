@@ -186,7 +186,7 @@ class _SettingsPageState extends State<SettingsPage> {
           ListTile(
             leading: const Icon(Icons.info),
             title: const Text('About'),
-            subtitle: const Text('Version 1.0.1 (1A2)'),
+            subtitle: const Text('Version 1.1.0 (1B1)'),
             onTap: () {
               // Show about details.
             },

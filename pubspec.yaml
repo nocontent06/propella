@@ -13,6 +13,8 @@ dependencies:
   cupertino_icons: ^1.0.2
   flutter_colorpicker: ^1.0.3
   icon_picker: ^2.1.0
+  mobile_scanner: ^7.0.0
+  http: ^1.4.0
 
 dev_dependencies:
   flutter_test:

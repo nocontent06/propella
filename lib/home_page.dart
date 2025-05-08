@@ -445,7 +445,7 @@ class _DeviceDetailSheet extends StatelessWidget {
 
   String? _typeImage(String type) {
     switch (type) {
-      case 'iOS':
+      case 'Apple':
         return 'lib/img/apple.png';
       case 'Android':
         return 'lib/img/android.png';
